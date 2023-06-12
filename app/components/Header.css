@@ -1,0 +1,22 @@
+.navbar {
+    position: absolute;
+    top: 0;
+    right: 0;;
+    width: 100%;
+    height: 100vh;
+    background-color: #fff;
+    color: black;
+    z-index: 999;
+}
+
+.navbar-open {
+}
+
+.toggle{
+    position: sticky;
+    float: right;
+    bottom: 55px;
+    right: 35px;
+    top: 0px;
+    z-index: 999;
+}

@@ -1,6 +1,7 @@
 'use client';
 import Footer from './components/Footer'
 import Header from './components/Header'
+import NavBar from './components/NavBar';
 import './globals.css'
 import { Inter } from 'next/font/google'
 import React, { useState, useEffect } from 'react';
@@ -29,17 +30,23 @@ export default function RootLayout({ children }) {
   const changeHeader = ScrollBreakPoint ? {
     backgroundColor: 'black',
     position: 'sticky',
-    transition: 'all 0.5s ease-in-out',
+    transition: 'all 0.8s ease-in-out',
   } : {
-    transition: 'all 0.5s ease-in-out',
+    transition: 'all 1s ease-in-out',
   };
 
   return (
     <html lang="en">
       <body className={inter.className}>
-        <Header style={changeHeader} />
-          {children}
-        <Footer />
+        <div className='m-0 main-background'>
+          <div className='bg-wrapper'>
+            <Header style={changeHeader} />
+              <div className='container'>
+                {children}
+              </div>
+            <Footer />
+          </div>
+        </div>
       </body>
     </html>
   )

@@ -18,12 +18,28 @@
 
 body {
   color: rgb(var(--foreground-rgb));
+  /* background-image: url(/images/background3.jpg);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: cover;
+  backdrop-filter: brightness(.5); */
+  overflow-x: hidden;
+}
+
+
+
+.main-background {
   background-image: url(/images/background3.jpg);
   background-repeat: no-repeat;
   background-position: center;
   background-size: cover;
+}
+.bg-wrapper{
   backdrop-filter: brightness(.5);
 }
+
+
+
 
 
 
