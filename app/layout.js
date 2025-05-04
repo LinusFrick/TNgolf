@@ -1,7 +1,7 @@
 'use client';
 import Footer from './components/Footer'
 import Header from './components/Header'
-import NavBar from './components/NavBar';
+import GolfBall from './components/tests/GolfBall';
 import './globals.css'
 import { Inter } from 'next/font/google'
 import React, { useState, useEffect } from 'react';
@@ -38,15 +38,10 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <body className={inter.className}>
-        <div className='m-0 main-background'>
-          <div className='bg-wrapper'>
             <Header style={changeHeader} />
-              <div className='container'>
                 {children}
-              </div>
-            <Footer />
-          </div>
-        </div>
+                <GolfBall />
+            {/* <Footer /> */}
       </body>
     </html>
   )

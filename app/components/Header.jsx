@@ -3,8 +3,24 @@ import Link from 'next/link'
 import '../globals.css'
 import './Header.css';
 import NavBar from './NavBar';
+import ThemeToggle from './theme';
+import { usePathname } from 'next/navigation';
+import { motion } from 'framer-motion';
+
+const links = [
+    {
+        href: '/', placeholder: 'Hem'
+    },
+    {
+        href: '/services', placeholder: 'Gruppträning'
+    },
+    {
+        href: '/bookings', placeholder: 'Priser',
+    },
+]
 
 export default function Header({ style }){
+    const path = usePathname();
 
     return(
         <header
@@ -18,18 +34,20 @@ export default function Header({ style }){
                     </li>
 
                 <div className='hidden md:flex justify-center items-center gap-24 mr-8 '>
-                    <li>
-                        <Link href="/"><h1 className=''>Hem</h1></Link>
+                    {links.map((link) => (
+                        <li key={link.href}>
+                            <motion.div
+                            whileHover={{ rotate: 180,
+                            rotateY: 50,
+                            scaleY: 3 }}>
+                                <Link className={`${link.href === path ? "text-yellow-400 font-bold" : ""} text-base`} href={link.href}>{link.placeholder}</Link>
+                            </motion.div>
+                        </li>
+                    ))}
+                    <li className='hidden-md'>
+                        <ThemeToggle />
                     </li>
-
-                    <li>
-                        <Link href="/services" ><h1>Gruppträning</h1></Link>
-                    </li> 
-
-                    <li>
-                        <Link href="/bookings"><h1>Priser</h1></Link>
-                    </li>
-                </div> 
+                </div>
                 <NavBar />
             </ul>
     </header>
