@@ -2,6 +2,8 @@
 @tailwind components;
 @tailwind utilities;
 
+/* FontAwesome CSS - imported via JavaScript in components */
+
 :root {
   --foreground-rgb: 0, 0, 0;
   --background-start-rgb: 214, 219, 220;
@@ -31,11 +33,28 @@ body[data-theme="dark"] {
   --color-bg-toggle: #a9a9a9;
 }
 
+html {
+  overflow-y: scroll;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+}
+
+html::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+}
+
 body {
   background: var(--color-bg-primary);
   color: var(--color-text-primary);
   font-family: sans-serif;
   transition: background 0.25s ease-in-out;
+  overflow-y: scroll;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+}
+
+body::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
 }
 
 
