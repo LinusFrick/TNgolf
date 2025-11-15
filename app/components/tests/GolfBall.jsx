@@ -47,6 +47,7 @@ function GolfBallModel({ scrollY, currentSection = 1, scale = CONFIG.SCALE, roll
   const section4InitializedRef = useRef(false); // Track if section 4 has been initialized
   const rollInTeleportedRef = useRef(false); // Track if we've already teleported in roll-in phase
   const scrollDirectionRef = useRef('forward'); // Track scroll direction: 'forward' or 'backward'
+  const lastMovementDirectionRef = useRef(1); // Track last movement direction: -1 for left, 1 for right, 0 for center
   const { viewport } = useThree();
 
   // Update scrollY ref when prop changes
@@ -80,6 +81,8 @@ function GolfBallModel({ scrollY, currentSection = 1, scale = CONFIG.SCALE, roll
       hasTransitionedRef.current = false; // Reset transition flag
       section4InitializedRef.current = false; // Reset section 4 initialization
       rollInTeleportedRef.current = false; // Reset roll-in teleport flag
+      // Set movement direction to right since we're rolling right
+      lastMovementDirectionRef.current = 1;
       console.log('Section 3 detected! Setting target X to:', rollDistance.right);
     } else if (currentSection === 4) {
       // Handle section 4 based on scroll direction
@@ -110,49 +113,56 @@ function GolfBallModel({ scrollY, currentSection = 1, scale = CONFIG.SCALE, roll
             console.log('Section 4 detected (scroll back)! Moving ball to left side at X:', leftSideTarget);
           }
         } else {
-          // Scrolling forward - normal initialization
-          // Section 4: First roll out to the right, then roll in from the left
-          // Check if we're already past the roll-out point (coming from section 3)
-          if (currentXRef.current >= rollDistance.rollOut - 0.5) {
-            // Already rolled out, go directly to roll-in phase
-            section4PhaseRef.current = 'rollIn';
-            rollInTeleportedRef.current = true; // Mark that we've teleported
-            // Start from a position closer to center so ball is visible immediately
-            currentXRef.current = rollDistance.startLeft + 3; // Start at -5 instead of -8 (more visible)
-            if (meshRef.current) {
-              meshRef.current.position.x = currentXRef.current;
-            }
-            targetXRef.current = rollDistance.startLeft + 5; // Roll to left side (-3), not center
-            opacityRef.current = 1; // Start fully visible
-            hasTransitionedRef.current = true;
-            previousXRef.current = currentXRef.current;
-            console.log('Section 4 detected! Already rolled out, teleporting to left side at X:', currentXRef.current, 'rolling to left side position');
-          } else if (currentXRef.current >= rollDistance.right - 0.5) {
-            // Ball is at section 3 position (2.5), start rolling out further to the right
-            section4PhaseRef.current = 'rollOut';
-            targetXRef.current = rollDistance.rollOut; // Roll further right to 8
-            hasTransitionedRef.current = false;
-            opacityRef.current = 1; // Keep visible during roll-out
-            console.log('Section 4 detected! Starting from section 3 position (2.5), rolling out further to the right to X:', rollDistance.rollOut);
-          } else {
-            // Ball is somewhere else (likely at center or left), determine what to do
-            if (Math.abs(currentXRef.current) < 0.5) {
-              // Ball is at center, start rolling out
-              section4PhaseRef.current = 'rollOut';
-              targetXRef.current = rollDistance.rollOut;
-              hasTransitionedRef.current = false;
-              opacityRef.current = 1; // Ensure visible when starting roll-out
-              console.log('Section 4 detected! Ball at center, starting roll-out to the right from X:', currentXRef.current);
-            } else {
-              // Ball is somewhere unexpected, go directly to roll-in
-              section4PhaseRef.current = 'rollIn';
-              rollInTeleportedRef.current = true;
-              hasTransitionedRef.current = true;
-              targetXRef.current = rollDistance.startLeft + 5; // Left side position
-              opacityRef.current = 1;
-              console.log('Section 4 detected! Ball at unexpected position X:', currentXRef.current, ', going to left side');
-            }
-          }
+             // Scrolling forward - normal initialization
+             // Section 4: First roll out to the right, then roll in from the left
+             // Check if we're already past the roll-out point (coming from section 3)
+             if (currentXRef.current >= rollDistance.rollOut - 0.5) {
+               // Already rolled out, go directly to roll-in phase
+               section4PhaseRef.current = 'rollIn';
+               rollInTeleportedRef.current = true; // Mark that we've teleported
+               // Start from a position closer to center so ball is visible immediately
+               currentXRef.current = rollDistance.startLeft + 3; // Start at -5 instead of -8 (more visible)
+               if (meshRef.current) {
+                 meshRef.current.position.x = currentXRef.current;
+               }
+               targetXRef.current = rollDistance.startLeft + 5; // Roll to left side (-3), not center
+               opacityRef.current = 1; // Start fully visible
+               hasTransitionedRef.current = true;
+               previousXRef.current = currentXRef.current;
+               // Don't update movement direction here - let it update naturally when ball starts moving left
+               // This prevents abrupt spin direction changes
+               console.log('Section 4 detected! Already rolled out, teleporting to left side at X:', currentXRef.current, 'rolling to left side position');
+             } else if (currentXRef.current >= rollDistance.right - 0.5) {
+               // Ball is at section 3 position (2.5), start rolling out further to the right
+               section4PhaseRef.current = 'rollOut';
+               targetXRef.current = rollDistance.rollOut; // Roll further right to 8
+               hasTransitionedRef.current = false;
+               opacityRef.current = 1; // Keep visible during roll-out
+               // Don't change movement direction yet - keep it as right since we're still rolling right
+               // The direction will be updated naturally when the ball actually starts moving
+               console.log('Section 4 detected! Starting from section 3 position (2.5), rolling out further to the right to X:', rollDistance.rollOut);
+             } else {
+               // Ball is somewhere else (likely at center or left), determine what to do
+               if (Math.abs(currentXRef.current) < 0.5) {
+                 // Ball is at center, start rolling out
+                 section4PhaseRef.current = 'rollOut';
+                 targetXRef.current = rollDistance.rollOut;
+                 hasTransitionedRef.current = false;
+                 opacityRef.current = 1; // Ensure visible when starting roll-out
+                 // Don't change movement direction yet - it will update naturally when ball moves
+                 console.log('Section 4 detected! Ball at center, starting roll-out to the right from X:', currentXRef.current);
+               } else {
+                 // Ball is somewhere unexpected, go directly to roll-in
+                 section4PhaseRef.current = 'rollIn';
+                 rollInTeleportedRef.current = true;
+                 hasTransitionedRef.current = true;
+                 targetXRef.current = rollDistance.startLeft + 5; // Left side position
+                 opacityRef.current = 1;
+                 // Update movement direction to left since we're rolling left
+                 lastMovementDirectionRef.current = -1;
+                 console.log('Section 4 detected! Ball at unexpected position X:', currentXRef.current, ', going to left side');
+               }
+             }
         }
       } else if (isScrollingBack) {
         // Already initialized, but scrolling back - ensure ball stays at left side
@@ -290,6 +300,8 @@ function GolfBallModel({ scrollY, currentSection = 1, scale = CONFIG.SCALE, roll
           targetXRef.current = rollDistance.startLeft + 5; // Roll to left side (-3), not center
           opacityRef.current = 1; // Start fully visible
           previousXRef.current = rollInStartX; // Update previous position
+          // Don't update movement direction here - let it update naturally when ball starts moving left
+          // This prevents abrupt spin direction changes
           console.log('Section 4 Phase 2: Transitioning to roll-in, ball at X:', rollInStartX, 'rolling to left side');
         }
       } else {
@@ -298,19 +310,21 @@ function GolfBallModel({ scrollY, currentSection = 1, scale = CONFIG.SCALE, roll
         const rollInStartX = rollDistance.startLeft + 3; // -5 instead of -8
         const leftSideTarget = rollDistance.startLeft + 5; // -3 (left side position, more visible and closer to center)
         
-        // CRITICAL: Only teleport once when entering roll-in phase, not every frame
-        // Use a flag to prevent repeated teleporting
-        if (!rollInTeleportedRef.current && currentXRef.current > rollInStartX + 1.5) {
-          // Ball is way off left side, teleport it there (but closer to center) - only once
-          rollInTeleportedRef.current = true;
-          currentXRef.current = rollInStartX;
-          if (meshRef.current) {
-            meshRef.current.position.x = rollInStartX;
-          }
-          targetOpacity = 1; // Start fully visible
-          previousXRef.current = rollInStartX;
-          console.log('Section 4 Roll-in: Teleporting ball to start position X:', rollInStartX);
-        }
+               // CRITICAL: Only teleport once when entering roll-in phase, not every frame
+               // Use a flag to prevent repeated teleporting
+               if (!rollInTeleportedRef.current && currentXRef.current > rollInStartX + 1.5) {
+                 // Ball is way off left side, teleport it there (but closer to center) - only once
+                 rollInTeleportedRef.current = true;
+                 currentXRef.current = rollInStartX;
+                 if (meshRef.current) {
+                   meshRef.current.position.x = rollInStartX;
+                 }
+                 targetOpacity = 1; // Start fully visible
+                 previousXRef.current = rollInStartX;
+                 // Don't update movement direction here - let it update naturally when ball starts moving
+                 // This prevents abrupt spin direction changes
+                 console.log('Section 4 Roll-in: Teleporting ball to start position X:', rollInStartX);
+               }
         
         // Ball should roll to left side position and stay there (not center)
         // Set target to left side position
@@ -364,13 +378,32 @@ function GolfBallModel({ scrollY, currentSection = 1, scale = CONFIG.SCALE, roll
     }
 
     // Rolling rotation effect when moving horizontally
-    // Calculate delta movement
+    // Calculate delta movement to determine rolling direction
     const xDelta = currentXRef.current - previousXRef.current;
     
-    // Calculate target rolling rotation based on horizontal position
-    // When rolling right (positive X), rotate around Y axis in one direction
-    // When at center, no rolling rotation
-    const targetRollRotation = currentXRef.current * CONFIG.ROLL_ROTATION_SPEED;
+    // Determine the direction the ball is currently moving
+    let movementDirection = 0; // -1 for left, 0 for stationary, 1 for right
+    if (Math.abs(xDelta) > 0.001) {
+      movementDirection = xDelta > 0 ? 1 : -1;
+      // Update last movement direction when actually moving
+      lastMovementDirectionRef.current = movementDirection;
+    } else {
+      // If not moving, use the position relative to center to determine spin direction
+      // Ball on right side spins as if it rolled right, ball on left side spins as if it rolled left
+      if (currentXRef.current > 0.5) {
+        movementDirection = 1; // Right side, spin right
+        lastMovementDirectionRef.current = 1;
+      } else if (currentXRef.current < -0.5) {
+        movementDirection = -1; // Left side, spin left
+        lastMovementDirectionRef.current = -1;
+      } else {
+        // Center - use last movement direction to maintain consistent spin
+        movementDirection = lastMovementDirectionRef.current !== 0 ? lastMovementDirectionRef.current : 1;
+      }
+    }
+    
+    // Calculate target rolling rotation based on movement direction
+    const targetRollRotation = movementDirection * CONFIG.ROLL_ROTATION_SPEED;
     
     // Smoothly interpolate to target rolling rotation
     rollRotationRef.current = THREE.MathUtils.lerp(
@@ -380,21 +413,22 @@ function GolfBallModel({ scrollY, currentSection = 1, scale = CONFIG.SCALE, roll
     );
 
     // Apply base rotation and rolling rotation smoothly
-    // X rotation continues normally (vertical spin) - consistent speed
+    // For X rotation (vertical spin), keep it consistent - don't flip based on horizontal movement
+    // The vertical spin should always be in the same direction for visual consistency
     meshRef.current.rotation.x += delta * CONFIG.ROTATION_SPEED_X;
     
-    // Y rotation: maintain consistent overall speed
-    // When rolling, use rolling rotation direction but keep the same speed as base rotation
+    // Y rotation: spin in the direction of movement
+    // When rolling, use rolling rotation direction but maintain consistent speed
     const baseYRotationSpeed = CONFIG.ROTATION_SPEED_Y;
     
     if (Math.abs(rollRotationRef.current) > 0.001) {
       // When rolling, use the rolling direction but maintain base rotation speed
-      // Normalize the rolling rotation direction and apply base speed
       const rollingDirection = rollRotationRef.current > 0 ? 1 : -1;
       meshRef.current.rotation.y += delta * baseYRotationSpeed * rollingDirection;
     } else {
-      // No rolling, use normal base rotation
-      meshRef.current.rotation.y += delta * baseYRotationSpeed;
+      // No rolling, use last movement direction to maintain consistent spin
+      const spinDirection = lastMovementDirectionRef.current !== 0 ? lastMovementDirectionRef.current : 1;
+      meshRef.current.rotation.y += delta * baseYRotationSpeed * spinDirection;
     }
     
     // Check if we've scrolled past the threshold
