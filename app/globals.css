@@ -57,6 +57,11 @@ body::-webkit-scrollbar {
   display: none; /* Chrome, Safari, Opera */
 }
 
+/* Hide Next.js dev tools portal */
+nextjs-portal {
+  display: none !important;
+}
+
 
 
 

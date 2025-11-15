@@ -10,7 +10,7 @@ const sections = [
   { id: 'section-5', label: 'Kontakt' },
 ];
 
-export default function SideNav() {
+export default function MobileNav() {
   const theme = useTheme();
   const isLight = theme === 'light';
   const [activeSection, setActiveSection] = useState('section-1');
@@ -49,36 +49,26 @@ export default function SideNav() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Theme-consistent darker shade background with curved border
+  // Theme-consistent background
   const navBgColor = isLight 
     ? 'bg-gray-800/95' 
     : 'bg-gray-900/95';
-  
-  // Darker shade border - darker than background
-  const borderColor = isLight
-    ? 'border-gray-900/50'
-    : 'border-gray-950/60';
 
   return (
-    <nav className={`hidden md:flex fixed left-0 top-1/2 -translate-y-1/2 z-40 ${navBgColor} backdrop-blur-md rounded-r-2xl shadow-2xl border-r-2 ${borderColor} transition-all duration-300
-      md:py-6 md:px-4 lg:py-10 lg:px-6`}>
-      <ul className="flex flex-col md:gap-4 lg:gap-7">
+    <nav className={`md:hidden fixed bottom-0 left-0 right-0 z-40 ${navBgColor} backdrop-blur-md border-t-2 ${isLight ? 'border-gray-900/50' : 'border-gray-950/60'} shadow-2xl`}>
+      <ul className="flex justify-around items-center px-2 py-2">
         {sections.map((section) => (
-          <li key={section.id}>
+          <li key={section.id} className="flex-1">
             <button
               onClick={() => scrollToSection(section.id)}
-              className={`w-full text-left rounded-lg transition-all duration-200
-                md:px-3 md:py-2 md:text-sm
-                lg:px-4 lg:py-3.5 lg:text-base
-                font-semibold
-                ${
+              className={`w-full text-center py-2 px-1 rounded-lg transition-all duration-200 text-xs sm:text-sm ${
                 activeSection === section.id
                   ? isLight
-                    ? 'text-yellow-500 bg-yellow-500/20'
-                    : 'text-yellow-400 bg-yellow-400/20'
+                    ? 'text-yellow-500 font-bold bg-yellow-500/20'
+                    : 'text-yellow-400 font-bold bg-yellow-400/20'
                   : isLight
-                    ? 'text-gray-200 hover:text-yellow-500 hover:bg-gray-700/50'
-                    : 'text-white hover:text-yellow-300 hover:bg-gray-700/50'
+                    ? 'text-gray-200 hover:text-yellow-500'
+                    : 'text-white hover:text-yellow-300'
               }`}
             >
               {section.label}
