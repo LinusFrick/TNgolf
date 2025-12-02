@@ -25,7 +25,7 @@ export default function Home() {
           <div className="text-center max-w-4xl mx-auto">
             <h2 id="section-3-heading" className="text-2xl sm:text-3xl md:text-4xl font-semibold mb-4 sm:mb-6">Tjänster</h2>
             <p className="text-base sm:text-lg md:text-xl text-gray-600 dark:text-gray-400 px-4">
-              Watch the ball roll right
+              Våra tjänster kommer här
             </p>
           </div>
         </section>

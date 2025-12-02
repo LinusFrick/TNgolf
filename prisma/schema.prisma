@@ -60,16 +60,22 @@ model VerificationToken {
 }
 
 model Booking {
-  id          String   @id @default(cuid())
-  userId      String
-  serviceType String   // e.g., "Golfträning", "Mental träning", "Gruppträning"
-  date        DateTime
-  time        String   // Time slot
-  notes       String?  // Additional notes from user
-  status      String   @default("pending") // "pending", "confirmed", "cancelled"
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id            String   @id @default(cuid())
+  userId        String
+  serviceType   String   // e.g., "Golfträning", "Mental träning", "Gruppträning"
+  date          DateTime
+  time          String   // Time slot
+  notes         String?  // Additional notes from user
+  status        String   @default("pending") // "pending", "confirmed", "cancelled"
+  paymentMethod String?  // Payment method: "stripe", "swish", etc.
+  // Stripe payment fields
+  paymentStatus String?  @default("pending") // "pending", "paid", "failed", "cancelled"
+  stripePaymentIntentId String? // Stripe Payment Intent ID
+  stripeSessionId String? // Stripe Checkout Session ID
+  amount         Float?   // Payment amount in SEK
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }
 
 model BlockedSlot {

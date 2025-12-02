@@ -46,7 +46,7 @@ export async function POST(request) {
       );
     }
 
-    const { serviceType, date, time, notes } = await request.json();
+    const { serviceType, date, time, notes, paymentMethod } = await request.json();
 
     if (!serviceType || !date || !time) {
       return NextResponse.json(
@@ -73,6 +73,15 @@ export async function POST(request) {
       );
     }
 
+    // Get service price
+    const SERVICE_TYPES = {
+      'golftraning': { price: 1079 },
+      'mental-traning': { price: 1079 },
+      'gruppträning': { price: 1079 },
+    };
+    const service = SERVICE_TYPES[serviceType];
+    const amount = service ? service.price : 0;
+
     const booking = await prisma.booking.create({
       data: {
         userId: session.user.id,
@@ -80,9 +89,20 @@ export async function POST(request) {
         date: new Date(date),
         time,
         notes: notes || null,
+        paymentMethod: paymentMethod || null,
+        paymentStatus: paymentMethod === 'stripe' ? 'pending' : null,
+        amount: paymentMethod === 'stripe' ? amount : null,
         status: 'pending',
       },
     });
+
+    // If Stripe payment, return booking with payment initiation flag
+    if (paymentMethod === 'stripe') {
+      return NextResponse.json({
+        ...booking,
+        requiresPayment: true,
+      }, { status: 201 });
+    }
 
     return NextResponse.json(booking, { status: 201 });
   } catch (error) {

@@ -5,6 +5,12 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useTheme } from "../components/useTheme";
 import Link from "next/link";
+import { loadStripe } from '@stripe/stripe-js';
+
+// Initialize Stripe (client-side only)
+const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY 
+  ? loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
+  : null;
 
 const SERVICE_TYPES = [
   { id: 'golftraning', name: 'Golfträning', description: 'Personlig golfträning för att förbättra ditt tekniska spel', price: 1079 },
@@ -22,10 +28,13 @@ export default function BokaPage() {
   const [selectedDate, setSelectedDate] = useState("");
   const [selectedTime, setSelectedTime] = useState("");
   const [notes, setNotes] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("stripe"); // Default to Stripe
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
   const [myBookings, setMyBookings] = useState([]);
+  const [testingEmail, setTestingEmail] = useState(null);
   const [availableSlots, setAvailableSlots] = useState([]);
   const [isLoadingSlots, setIsLoadingSlots] = useState(false);
   const [expandedDays, setExpandedDays] = useState(new Set());
@@ -57,6 +66,24 @@ export default function BokaPage() {
       setAvailableSlots([]);
     }
   }, [selectedService, currentWeekStart]);
+
+  // Check for payment success/cancel in URL params
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const paymentStatus = urlParams.get('payment');
+    const bookingId = urlParams.get('booking');
+
+    if (paymentStatus === 'success' && bookingId) {
+      setSuccess(true);
+      fetchMyBookings();
+      fetchAvailableSlots();
+      // Clean URL
+      window.history.replaceState({}, '', '/boka');
+    } else if (paymentStatus === 'cancelled') {
+      setError('Betalningen avbröts');
+      window.history.replaceState({}, '', '/boka');
+    }
+  }, []);
 
   const fetchMyBookings = async () => {
     try {
@@ -103,6 +130,7 @@ export default function BokaPage() {
     }
 
     try {
+      // Step 1: Create booking
       const response = await fetch('/api/bookings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -111,6 +139,7 @@ export default function BokaPage() {
           date: selectedDate,
           time: selectedTime,
           notes: notes || null,
+          paymentMethod: paymentMethod,
         }),
       });
 
@@ -120,18 +149,73 @@ export default function BokaPage() {
         throw new Error(data.error || 'Bokning misslyckades');
       }
 
-      setSuccess(true);
-      setSelectedDate("");
-      setSelectedTime("");
-      setNotes("");
-      fetchMyBookings();
-      fetchAvailableSlots(); // Refresh available slots
-      
-      setTimeout(() => setSuccess(false), 5000);
+      // Step 2: If Stripe payment required, create checkout session
+      if (data.requiresPayment && paymentMethod === 'stripe') {
+        setIsProcessingPayment(true);
+        
+        const paymentResponse = await fetch('/api/stripe/create-checkout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            bookingId: data.id,
+          }),
+        });
+
+        const paymentData = await paymentResponse.json();
+
+        if (!paymentResponse.ok) {
+          throw new Error(paymentData.error || 'Betalning misslyckades');
+        }
+
+        // Redirect to Stripe Checkout
+        if (paymentData.url) {
+          window.location.href = paymentData.url;
+        } else {
+          throw new Error('Kunde inte ladda Stripe Checkout');
+        }
+      } else {
+        // Non-Stripe payment or no payment required
+        setSuccess(true);
+        resetForm();
+      }
     } catch (err) {
       setError(err.message || 'Något gick fel');
+      setIsProcessingPayment(false);
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const resetForm = () => {
+    setSelectedDate("");
+    setSelectedTime("");
+    setNotes("");
+    setPaymentMethod("stripe");
+    setTimeout(() => setSuccess(false), 5000);
+  };
+
+  const testEmail = async (bookingId) => {
+    setTestingEmail(bookingId);
+    setError("");
+    try {
+      const response = await fetch('/api/test-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bookingId }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || data.details || 'Kunde inte skicka test-e-post');
+      }
+
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 5000);
+    } catch (err) {
+      setError(err.message || 'Kunde inte skicka test-e-post');
+    } finally {
+      setTestingEmail(null);
     }
   };
 
@@ -408,26 +492,103 @@ export default function BokaPage() {
                   onChange={(e) => setNotes(e.target.value)}
                   rows={4}
                   aria-label="Ytterligare information om bokningen"
-                  className={`w-full min-h-[44px] px-4 py-2 rounded-lg ${inputBg} ${textColor} border ${borderColor} focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors resize-y`}
+                  className={`w-full min-h-[44px] px-4 py-2 rounded-lg ${inputBg} ${textColor} border ${borderColor} focus:outline-none focus:ring-1 focus:ring-blue-500/50 focus:ring-inset transition-colors resize-y`}
                   placeholder="Berätta om dina mål eller önskemål..."
                 />
               </div>
 
+              {/* Payment Method Selection */}
+              {selectedDate && selectedTime && selectedService && (
+                <div>
+                  <fieldset>
+                    <legend className={`block text-sm font-semibold mb-3 ${textColor}`}>
+                      Betalningsmetod <span className="text-red-500" aria-label="obligatoriskt">*</span>
+                    </legend>
+                    <div className="space-y-2" role="radiogroup" aria-label="Välj betalningsmetod">
+                      <label
+                        className={`flex items-center min-h-[44px] p-4 rounded-lg border-2 cursor-pointer transition-all duration-200 ${
+                          paymentMethod === 'stripe'
+                            ? isLight
+                              ? 'border-blue-500 bg-blue-50'
+                              : 'border-blue-500 bg-blue-900/20'
+                            : `${borderColor} ${cardBg} hover:border-blue-300`
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="paymentMethod"
+                          value="stripe"
+                          checked={paymentMethod === 'stripe'}
+                          onChange={(e) => setPaymentMethod(e.target.value)}
+                          className="mr-3 w-5 h-5 focus:outline-none focus:ring-1 focus:ring-blue-500/50 focus:ring-inset flex-shrink-0"
+                          required
+                        />
+                        <div className="flex-1 flex items-center gap-3">
+                          <div className={`text-2xl font-bold ${paymentMethod === 'stripe' ? 'text-blue-600 dark:text-blue-400' : textColor}`}>
+                            Kortbetalning
+                          </div>
+                          <div className={`text-xs ${isLight ? 'text-gray-500' : 'text-gray-400'}`}>
+                            Betala säkert med kort via Stripe
+                          </div>
+                        </div>
+                        {paymentMethod === 'stripe' && (
+                          <div className={`ml-2 flex-shrink-0 ${isLight ? 'text-blue-600' : 'text-blue-400'}`}>
+                            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                            </svg>
+                          </div>
+                        )}
+                      </label>
+                    </div>
+                    {paymentMethod === 'stripe' && selectedService && (
+                      <div className={`mt-3 p-4 rounded-lg ${isLight ? 'bg-blue-50 border border-blue-200' : 'bg-blue-900/20 border border-blue-700'}`}>
+                        <div className="flex items-start gap-3 mb-3">
+                          <div className={`flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center ${isLight ? 'bg-blue-100' : 'bg-blue-800/50'}`}>
+                            <svg className="w-6 h-6 text-blue-600 dark:text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                              <path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4z" />
+                              <path fillRule="evenodd" d="M18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13a1 1 0 011-1h1a1 1 0 110 2H5a1 1 0 01-1-1zm5-1a1 1 0 100 2h1a1 1 0 100-2H9z" clipRule="evenodd" />
+                            </svg>
+                          </div>
+                          <div className="flex-1">
+                            <p className={`text-sm font-semibold mb-1 ${isLight ? 'text-blue-800' : 'text-blue-300'}`}>
+                              Säker kortbetalning
+                            </p>
+                            <p className={`text-xs ${isLight ? 'text-blue-700' : 'text-blue-400'}`}>
+                              Du omdirigeras till Stripe Checkout för säker betalning. Vi lagrar inte dina kortuppgifter.
+                            </p>
+                          </div>
+                        </div>
+                        <div className={`pt-3 border-t ${isLight ? 'border-blue-200' : 'border-blue-700'}`}>
+                          <div className="flex items-center justify-between">
+                            <span className={`text-sm ${isLight ? 'text-gray-700' : 'text-gray-300'}`}>
+                              Totalt att betala:
+                            </span>
+                            <span className={`text-lg font-bold ${isLight ? 'text-blue-900' : 'text-blue-200'}`}>
+                              {SERVICE_TYPES.find(s => s.id === selectedService)?.price.toLocaleString('sv-SE')} kr
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </fieldset>
+                </div>
+              )}
+
               <button
                 type="submit"
-                disabled={isSubmitting || !selectedService || !selectedDate || !selectedTime}
-                aria-busy={isSubmitting}
-                aria-label={isSubmitting ? 'Skapar bokning...' : 'Boka vald tid'}
+                disabled={isSubmitting || isProcessingPayment || !selectedService || !selectedDate || !selectedTime || !paymentMethod}
+                aria-busy={isSubmitting || isProcessingPayment}
+                aria-label={isSubmitting || isProcessingPayment ? 'Skapar bokning...' : 'Boka vald tid'}
                 className={`w-full min-h-[44px] py-3 rounded-lg font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
-                  isSubmitting || !selectedService || !selectedDate || !selectedTime
+                  isSubmitting || isProcessingPayment || !selectedService || !selectedDate || !selectedTime
                     ? 'bg-gray-400 cursor-not-allowed'
                     : 'bg-blue-600 hover:bg-blue-700 active:bg-blue-800'
                 } text-white`}
               >
-                {isSubmitting ? (
+                {isSubmitting || isProcessingPayment ? (
                   <span className="flex items-center justify-center gap-2">
                     <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></span>
-                    Skapar bokning...
+                    {isProcessingPayment ? 'Öppnar betalning...' : 'Skapar bokning...'}
                   </span>
                 ) : (
                   'Boka tid'
@@ -736,12 +897,32 @@ export default function BokaPage() {
                       <div className={`text-sm ${isLight ? 'text-gray-600' : 'text-gray-400'}`}>
                         {formatDate(booking.date)} kl {booking.time}
                       </div>
-                      <div className={`text-xs mt-2 px-2 py-1 rounded inline-block ${
-                        booking.status === 'confirmed'
-                          ? isLight ? 'bg-green-100 text-green-800' : 'bg-green-900/30 text-green-300'
-                          : isLight ? 'bg-yellow-100 text-yellow-800' : 'bg-yellow-900/30 text-yellow-300'
-                      }`}>
-                        {booking.status === 'confirmed' ? 'Bekräftad' : 'Väntar på bekräftelse'}
+                      <div className="flex items-center justify-between mt-2">
+                        <div className={`text-xs px-2 py-1 rounded inline-block ${
+                          booking.status === 'confirmed'
+                            ? isLight ? 'bg-green-100 text-green-800' : 'bg-green-900/30 text-green-300'
+                            : isLight ? 'bg-yellow-100 text-yellow-800' : 'bg-yellow-900/30 text-yellow-300'
+                        }`}>
+                          {booking.status === 'confirmed' ? 'Bekräftad' : 'Väntar på bekräftelse'}
+                        </div>
+                        {booking.status === 'confirmed' && (
+                          <button
+                            type="button"
+                            onClick={() => testEmail(booking.id)}
+                            disabled={testingEmail === booking.id}
+                            className={`text-xs px-3 py-1.5 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                              testingEmail === booking.id
+                                ? 'opacity-50 cursor-not-allowed'
+                                : ''
+                            } ${
+                              isLight
+                                ? 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                                : 'bg-blue-900/30 text-blue-300 hover:bg-blue-900/50'
+                            }`}
+                          >
+                            {testingEmail === booking.id ? 'Skickar...' : 'Testa e-post'}
+                          </button>
+                        )}
                       </div>
                     </div>
                   );
