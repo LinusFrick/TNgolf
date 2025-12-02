@@ -27,6 +27,24 @@ const CONFIG = {
   FADE_IN_START: -4,     // Start fading in when X > this value
 };
 
+// Camera controller that follows ball horizontally to maintain consistent visual size
+function CameraController({ ballXRef }) {
+  const { camera } = useThree();
+  const targetCameraX = useRef(0);
+  
+  useFrame(() => {
+    if (!ballXRef) return;
+    const ballX = ballXRef.current;
+    // Smoothly move camera horizontally to follow ball, but with reduced movement
+    // This compensates for perspective distortion while keeping camera relatively centered
+    targetCameraX.current = ballX * 0.3; // Follow at 30% to reduce distortion without being too obvious
+    camera.position.x = THREE.MathUtils.lerp(camera.position.x, targetCameraX.current, 0.05);
+    camera.lookAt(ballX, 0, 0); // Always look at the ball's position
+  });
+  
+  return null;
+}
+
 function GolfBallModel({ scrollY, currentSection = 1, scale = CONFIG.SCALE, rollDistance = { right: CONFIG.SECTION3_ROLL_X, rollOut: CONFIG.SECTION4_ROLL_OUT_X, left: CONFIG.SECTION4_ROLL_X, startLeft: CONFIG.SECTION4_START_X } }) {
   const { scene } = useGLTF('/images/uploads_files_4209240_Golf+Ball+Generic.glb');
   const meshRef = useRef();

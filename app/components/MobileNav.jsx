@@ -66,7 +66,7 @@ export default function MobileNav() {
       className={`md:hidden fixed bottom-0 left-0 right-0 z-40 ${navBgColor} backdrop-blur-md border-t-2 ${isLight ? 'border-gray-900/50' : 'border-gray-950/60'} shadow-2xl`}
       aria-label="Mobilnavigering"
     >
-      <ul className="flex justify-around items-center px-2 py-2" role="list">
+      <ul className="flex items-center justify-between px-3 py-2" role="list">
         {sections.map((section) => (
           <li key={section.id} className="flex-1">
             <button
@@ -87,7 +87,7 @@ export default function MobileNav() {
             </button>
           </li>
         ))}
-        {/* Admin link - only show for coach */}
+        {/* Conditional link based on user role */}
         {isCheckingCoach ? (
           <li className="flex-1">
             <div 
@@ -119,6 +119,25 @@ export default function MobileNav() {
               }`}
             >
               Admin
+            </Link>
+          </li>
+        ) : session ? (
+          <li className="flex-1">
+            <Link
+              href="/boka"
+              aria-label="Visa mitt GolfMind"
+              aria-current={pathname === '/boka' ? 'page' : undefined}
+              className={`w-full text-center min-h-[44px] min-w-[44px] py-2 px-1 rounded-lg transition-all duration-200 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:ring-offset-2 ${
+                pathname === '/boka'
+                  ? isLight
+                    ? 'text-yellow-500 font-bold bg-yellow-500/20'
+                    : 'text-yellow-400 font-bold bg-yellow-400/20'
+                  : isLight
+                    ? 'text-gray-200 hover:text-yellow-500 active:bg-gray-700/50'
+                    : 'text-white hover:text-yellow-300 active:bg-gray-700/50'
+              }`}
+            >
+              Mitt GolfMind
             </Link>
           </li>
         ) : null}

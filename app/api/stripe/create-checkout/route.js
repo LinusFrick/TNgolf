@@ -83,7 +83,7 @@ export async function POST(request) {
         },
       ],
       mode: 'payment',
-      success_url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/boka?booking=${bookingId}&payment=success`,
+      success_url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/boka?booking=${bookingId}&payment=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/boka?booking=${bookingId}&payment=cancelled`,
       customer_email: booking.user.email,
       metadata: {

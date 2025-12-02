@@ -34,7 +34,8 @@ export default function BokaPage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
   const [myBookings, setMyBookings] = useState([]);
-  const [testingEmail, setTestingEmail] = useState(null);
+  const [cancellingBookingId, setCancellingBookingId] = useState(null);
+  const [cancelMessage, setCancelMessage] = useState("");
   const [availableSlots, setAvailableSlots] = useState([]);
   const [isLoadingSlots, setIsLoadingSlots] = useState(false);
   const [expandedDays, setExpandedDays] = useState(new Set());
@@ -72,11 +73,37 @@ export default function BokaPage() {
     const urlParams = new URLSearchParams(window.location.search);
     const paymentStatus = urlParams.get('payment');
     const bookingId = urlParams.get('booking');
+    const sessionId = urlParams.get('session_id');
 
     if (paymentStatus === 'success' && bookingId) {
-      setSuccess(true);
-      fetchMyBookings();
-      fetchAvailableSlots();
+      // Check payment status and send email if needed (fallback for local testing)
+      if (sessionId) {
+        fetch('/api/stripe/check-payment', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ bookingId, sessionId }),
+        })
+          .then(res => res.json())
+          .then(data => {
+            if (data.success) {
+              setSuccess(true);
+              fetchMyBookings();
+              fetchAvailableSlots();
+            } else {
+              setError(data.error || 'Kunde inte verifiera betalning');
+            }
+          })
+          .catch(err => {
+            console.error('Error checking payment:', err);
+            setSuccess(true); // Still show success even if check fails
+            fetchMyBookings();
+            fetchAvailableSlots();
+          });
+      } else {
+        setSuccess(true);
+        fetchMyBookings();
+        fetchAvailableSlots();
+      }
       // Clean URL
       window.history.replaceState({}, '', '/boka');
     } else if (paymentStatus === 'cancelled') {
@@ -95,6 +122,54 @@ export default function BokaPage() {
     } catch (err) {
       console.error('Error fetching bookings:', err);
     }
+  };
+
+  const handleCancelBooking = async (bookingId, bookingDate, bookingTime) => {
+    if (!confirm('Är du säker på att du vill begära avbokning av denna bokning?')) {
+      return;
+    }
+
+    setCancellingBookingId(bookingId);
+    setCancelMessage("");
+    
+    try {
+      const response = await fetch(`/api/bookings/${bookingId}/cancel`, {
+        method: 'POST',
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Kunde inte skicka avbokningsförfrågan');
+      }
+
+      setCancelMessage(`Avbokningsförfrågan för bokning ${bookingId.slice(-8)} har skickats till admin.`);
+      // Refresh bookings
+      fetchMyBookings();
+    } catch (err) {
+      setCancelMessage(err.message || 'Något gick fel vid avbokningsförfrågan');
+    } finally {
+      setCancellingBookingId(null);
+    }
+  };
+
+  // Calculate if cancellation is allowed (48h before booking)
+  const canCancel = (bookingDate, bookingTime) => {
+    if (!bookingDate || !bookingTime) return false;
+    
+    // bookingDate can be a Date object or a date string
+    const date = bookingDate instanceof Date ? bookingDate : parseDateString(bookingDate);
+    if (!date) return false;
+    
+    const [hours, minutes] = bookingTime.split(':');
+    const bookingDateTime = new Date(date);
+    bookingDateTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+    
+    const now = new Date();
+    const hoursUntilBooking = Math.floor((bookingDateTime - now) / (1000 * 60 * 60));
+    
+    // Only allow cancellation if more than 48 hours remain
+    return hoursUntilBooking > 48;
   };
 
   const fetchAvailableSlots = async () => {
@@ -194,58 +269,77 @@ export default function BokaPage() {
     setTimeout(() => setSuccess(false), 5000);
   };
 
-  const testEmail = async (bookingId) => {
-    setTestingEmail(bookingId);
-    setError("");
-    try {
-      const response = await fetch('/api/test-email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bookingId }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || data.details || 'Kunde inte skicka test-e-post');
-      }
-
-      setSuccess(true);
-      setTimeout(() => setSuccess(false), 5000);
-    } catch (err) {
-      setError(err.message || 'Kunde inte skicka test-e-post');
-    } finally {
-      setTestingEmail(null);
+  // Helper to convert date string (YYYY-MM-DD or ISO string) to Date object in Swedish timezone
+  const parseDateString = (dateString) => {
+    if (!dateString) return null;
+    
+    // If it's already a Date object, return it
+    if (dateString instanceof Date) {
+      return dateString;
     }
+    
+    // If it's an ISO string (from API), extract YYYY-MM-DD part
+    let dateStr = dateString;
+    if (dateString.includes('T')) {
+      dateStr = dateString.split('T')[0];
+    }
+    
+    // dateStr is now in format "YYYY-MM-DD"
+    const [year, month, day] = dateStr.split('-').map(Number);
+    // Create date in local timezone (Sweden)
+    return new Date(year, month - 1, day, 12, 0, 0, 0); // Use noon to avoid DST issues
   };
 
-  const formatDate = (dateString) => {
-    const date = new Date(dateString);
+  const formatDate = (dateInput) => {
+    // Handle both Date objects and date strings (YYYY-MM-DD)
+    let date;
+    if (dateInput instanceof Date) {
+      date = dateInput;
+    } else if (typeof dateInput === 'string') {
+      date = parseDateString(dateInput);
+    } else {
+      return '';
+    }
+    if (!date) return '';
     return date.toLocaleDateString('sv-SE', { 
-      weekday: 'long', 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      timeZone: 'Europe/Stockholm'
     });
   };
 
-  const formatDateShort = (dateString) => {
-    const date = new Date(dateString);
+  const formatDateShort = (dateInput) => {
+    // Handle both Date objects and date strings (YYYY-MM-DD)
+    let date;
+    if (dateInput instanceof Date) {
+      date = dateInput;
+    } else if (typeof dateInput === 'string') {
+      date = parseDateString(dateInput);
+    } else {
+      return '';
+    }
+    if (!date) return '';
     return date.toLocaleDateString('sv-SE', { 
       weekday: 'short', 
       month: 'short', 
-      day: 'numeric' 
+      day: 'numeric',
+      timeZone: 'Europe/Stockholm'
     });
   };
 
-  // Get week dates (Monday to Sunday)
+  // Get week dates (Monday to Saturday - no Sundays)
   const getWeekDates = () => {
     const dates = [];
     const start = new Date(currentWeekStart);
     for (let i = 0; i < 7; i++) {
       const date = new Date(start);
       date.setDate(start.getDate() + i);
-      dates.push(date);
+      // Skip Sundays (day 0)
+      if (date.getDay() !== 0) {
+        dates.push(date);
+      }
     }
     return dates;
   };
@@ -291,9 +385,17 @@ export default function BokaPage() {
     });
   };
 
+  // Helper to convert Date object to YYYY-MM-DD string in Swedish timezone
+  const dateToDateString = (date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   // Expand all days
   const expandAllDays = () => {
-    const allDates = getWeekDates().map(date => date.toISOString().split('T')[0]);
+    const allDates = getWeekDates().map(date => dateToDateString(date));
     setExpandedDays(new Set(allDates));
   };
 
@@ -350,8 +452,8 @@ export default function BokaPage() {
   const borderColor = isLight ? 'border-gray-300' : 'border-gray-600';
 
   return (
-    <div className={`min-h-screen ${bgColor} ${textColor} py-12 px-4 pt-40 sm:pt-44 md:pt-48 lg:pt-52`}>
-      <div className="max-w-4xl mx-auto">
+    <div className={`min-h-screen ${bgColor} ${textColor} py-6 px-4 sm:px-6 md:px-8 pt-4 md:pt-8 lg:pt-12`}>
+      <div className="max-w-7xl mx-auto">
         <h1 className="text-4xl font-bold mb-8 text-center">Boka en tid</h1>
 
         {success && (
@@ -377,7 +479,7 @@ export default function BokaPage() {
         {/* Main Booking Section */}
         <div className="flex flex-col lg:flex-row gap-6 mb-8">
           {/* Booking Form - Full width when no service selected, narrower when calendar is shown */}
-          <div className={`${cardBg} p-4 sm:p-6 rounded-xl shadow-lg ${selectedService ? 'lg:w-2/5' : 'w-full'}`}>
+          <div className={`${cardBg} p-4 sm:p-6 rounded-xl shadow-lg ${selectedService ? 'lg:w-2/5 xl:w-2/5' : 'w-full'}`}>
             <div className="mb-6">
               <h2 className="text-2xl font-semibold mb-2">Välj tjänst och tid</h2>
               {!selectedService && (
@@ -599,7 +701,7 @@ export default function BokaPage() {
 
           {/* Calendar View - Improved Design */}
           {selectedService && (
-            <div className={`${cardBg} p-4 sm:p-6 rounded-xl shadow-lg lg:w-3/5`}>
+            <div className={`${cardBg} p-4 sm:p-6 rounded-xl shadow-lg lg:w-3/5 xl:w-3/5`}>
               <div className="mb-6">
                 <h2 className="text-2xl font-semibold mb-2">Tillgängliga tider</h2>
                 <p className={`text-sm ${isLight ? 'text-gray-600' : 'text-gray-400'}`}>
@@ -695,17 +797,18 @@ export default function BokaPage() {
                   <div className="space-y-3">
                     {getWeekDates()
                       .map((date, dayIndex) => {
-                        const dateStr = date.toISOString().split('T')[0];
+                        const dateStr = dateToDateString(date);
                         const availableTimes = getAvailableTimesForDate(dateStr);
                         return { date, dayIndex, dateStr, availableTimes };
                       })
                       .filter(({ availableTimes }) => availableTimes.length > 0)
                       .map(({ date, dayIndex, dateStr, availableTimes }) => {
-                        const dayName = date.toLocaleDateString('sv-SE', { weekday: 'long' });
-                        const dayNameShort = date.toLocaleDateString('sv-SE', { weekday: 'short' });
+                        const dayName = date.toLocaleDateString('sv-SE', { weekday: 'long', timeZone: 'Europe/Stockholm' });
+                        const dayNameShort = date.toLocaleDateString('sv-SE', { weekday: 'short', timeZone: 'Europe/Stockholm' });
                         const dayNum = date.getDate();
-                        const monthName = date.toLocaleDateString('sv-SE', { month: 'short' });
-                        const isToday = dateStr === new Date().toISOString().split('T')[0];
+                        const monthName = date.toLocaleDateString('sv-SE', { month: 'short', timeZone: 'Europe/Stockholm' });
+                        const todayStr = dateToDateString(new Date());
+                        const isToday = dateStr === todayStr;
                         const selectedServiceData = SERVICE_TYPES.find(s => s.id === selectedService);
                         const price = selectedServiceData?.price || 0;
                         const isExpanded = expandedDays.has(dateStr);
@@ -884,8 +987,19 @@ export default function BokaPage() {
               </p>
             ) : (
               <div className="space-y-4">
+                {cancelMessage && (
+                  <div className={`p-4 rounded-lg border-2 ${
+                    cancelMessage.includes('skickats')
+                      ? isLight ? 'bg-green-50 border-green-200 text-green-800' : 'bg-green-900/20 border-green-800/50 text-green-200'
+                      : isLight ? 'bg-red-50 border-red-200 text-red-800' : 'bg-red-900/20 border-red-800/50 text-red-200'
+                  }`}>
+                    <p className="text-sm">{cancelMessage}</p>
+                  </div>
+                )}
                 {myBookings.map((booking) => {
                   const service = SERVICE_TYPES.find(s => s.id === booking.serviceType);
+                  const isCancellable = booking.status !== 'cancelled' && booking.cancellationRequest !== 'pending' && canCancel(booking.date, booking.time);
+                  
                   return (
                     <div
                       key={booking.id}
@@ -897,32 +1011,50 @@ export default function BokaPage() {
                       <div className={`text-sm ${isLight ? 'text-gray-600' : 'text-gray-400'}`}>
                         {formatDate(booking.date)} kl {booking.time}
                       </div>
-                      <div className="flex items-center justify-between mt-2">
-                        <div className={`text-xs px-2 py-1 rounded inline-block ${
-                          booking.status === 'confirmed'
-                            ? isLight ? 'bg-green-100 text-green-800' : 'bg-green-900/30 text-green-300'
-                            : isLight ? 'bg-yellow-100 text-yellow-800' : 'bg-yellow-900/30 text-yellow-300'
-                        }`}>
-                          {booking.status === 'confirmed' ? 'Bekräftad' : 'Väntar på bekräftelse'}
+                      <div className="flex items-center justify-between mt-2 flex-wrap gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <div className={`text-xs px-2 py-1 rounded inline-block ${
+                            booking.status === 'confirmed'
+                              ? isLight ? 'bg-green-100 text-green-800' : 'bg-green-900/30 text-green-300'
+                              : isLight ? 'bg-yellow-100 text-yellow-800' : 'bg-yellow-900/30 text-yellow-300'
+                          }`}>
+                            {booking.status === 'confirmed' ? 'Bekräftad' : 'Väntar på bekräftelse'}
+                          </div>
+                          {booking.cancellationRequest === 'pending' && (
+                            <div className={`text-xs px-2 py-1 rounded inline-block ${
+                              isLight ? 'bg-blue-100 text-blue-800' : 'bg-blue-900/30 text-blue-300'
+                            }`}>
+                              Avbokning begärd
+                            </div>
+                          )}
                         </div>
-                        {booking.status === 'confirmed' && (
-                          <button
-                            type="button"
-                            onClick={() => testEmail(booking.id)}
-                            disabled={testingEmail === booking.id}
-                            className={`text-xs px-3 py-1.5 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                              testingEmail === booking.id
-                                ? 'opacity-50 cursor-not-allowed'
-                                : ''
-                            } ${
-                              isLight
-                                ? 'bg-blue-100 text-blue-700 hover:bg-blue-200'
-                                : 'bg-blue-900/30 text-blue-300 hover:bg-blue-900/50'
-                            }`}
-                          >
-                            {testingEmail === booking.id ? 'Skickar...' : 'Testa e-post'}
-                          </button>
-                        )}
+                        <div className="flex items-center gap-2">
+                          {booking.status === 'confirmed' && booking.paymentStatus === 'paid' && (
+                            <Link
+                              href={`/kvitto/${booking.id}`}
+                              className={`text-xs px-3 py-1.5 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                                isLight
+                                  ? 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                                  : 'bg-blue-900/30 text-blue-300 hover:bg-blue-900/50'
+                              }`}
+                            >
+                              Se kvitto
+                            </Link>
+                          )}
+                          {isCancellable && (
+                            <button
+                              onClick={() => handleCancelBooking(booking.id, booking.date, booking.time)}
+                              disabled={cancellingBookingId === booking.id}
+                              className={`text-xs px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-red-500 ${
+                                isLight
+                                  ? 'bg-red-100 text-red-700 hover:bg-red-200'
+                                  : 'bg-red-900/30 text-red-300 hover:bg-red-900/50'
+                              }`}
+                            >
+                              {cancellingBookingId === booking.id ? 'Skickar...' : 'Begär avbokning'}
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   );

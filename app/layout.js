@@ -10,7 +10,7 @@ const inter = Inter({
 })
 
 export const metadata = {
-  title: 'TN Golf',
+  title: 'Golfmind',
   description: 'Golf coaching and mental training',
 }
 

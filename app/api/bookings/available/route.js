@@ -45,12 +45,14 @@ export async function GET(request) {
     const dateRange = generateDateRange();
     
     // Get all existing bookings (all services, not filtered by serviceType for availability check)
-    // This ensures we check all bookings to see what's actually booked
+    // Only count bookings that are actually paid or confirmed as booked
+    // Pending bookings without payment should not block the time slot
     const existingBookings = await prisma.booking.findMany({
       where: {
-        status: {
-          in: ['pending', 'confirmed'],
-        },
+        OR: [
+          { status: 'confirmed' },
+          { paymentStatus: 'paid' }, // Paid but not yet confirmed by admin
+        ],
       },
       select: {
         date: true,
@@ -71,16 +73,22 @@ export async function GET(request) {
     // Format: "YYYY-MM-DD_TIME" for all bookings and blocked slots
     const bookedSlots = new Set();
     existingBookings.forEach(booking => {
-      // Convert date to YYYY-MM-DD format for comparison
+      // Convert date to YYYY-MM-DD format for comparison (avoid timezone issues)
       const bookingDate = new Date(booking.date);
-      const dateStr = bookingDate.toISOString().split('T')[0];
+      const year = bookingDate.getFullYear();
+      const month = bookingDate.getMonth();
+      const day = bookingDate.getDate();
+      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
       bookedSlots.add(`${dateStr}_${booking.time}`);
     });
     
     // Add blocked slots to booked slots
     blockedSlots.forEach(block => {
       const blockDate = new Date(block.date);
-      const dateStr = blockDate.toISOString().split('T')[0];
+      const year = blockDate.getFullYear();
+      const month = blockDate.getMonth();
+      const day = blockDate.getDate();
+      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
       bookedSlots.add(`${dateStr}_${block.time}`);
     });
     
@@ -88,7 +96,11 @@ export async function GET(request) {
     const availableSlots = [];
     
     dateRange.forEach(date => {
-      const dateStr = date.toISOString().split('T')[0];
+      // Convert date to YYYY-MM-DD format using local time (Swedish timezone)
+      const year = date.getFullYear();
+      const month = date.getMonth();
+      const day = date.getDate();
+      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
       const availableTimes = [];
       
       TIME_SLOTS.forEach(time => {

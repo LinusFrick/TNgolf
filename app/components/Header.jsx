@@ -23,12 +23,12 @@ export default function Header(){
             {path === '/' && <MobileNav />}
             
             {/* Top Navigation Bar - Balanced Layout */}
-            <div className="fixed z-50 top-0 left-0 right-0 
+            <div className={`${path === '/boka' || path?.startsWith('/kvitto') ? 'relative' : 'fixed top-0 left-0 right-0'} z-50 
               flex items-center justify-between
               px-3 py-3
               sm:px-4 sm:py-4
               md:px-5 md:py-5
-              lg:px-6 lg:py-6">
+              lg:px-6 lg:py-6`}>
                 {/* Left: Logo and Theme Toggle */}
                 <div className="flex items-center gap-3 sm:gap-4">
                     <Logo className="

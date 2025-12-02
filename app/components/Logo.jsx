@@ -15,7 +15,7 @@ export default function Logo({ className = 'w-60', href = '/', onClick }) {
     const logoElement = (
         <Image
             src="/images/logo-white.svg"
-            alt="TN Golf - Logotyp"
+            alt="Golfmind - Logotyp"
             width={240}
             height={80}
             className={`transition-all duration-300 ${className}`}

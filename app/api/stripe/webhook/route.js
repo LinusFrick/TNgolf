@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import Stripe from "stripe";
-import { sendBookingConfirmationEmail } from "../../lib/email";
+import { sendNewBookingNotificationEmail } from "../../lib/email";
 
 const prisma = new PrismaClient();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
@@ -55,18 +55,35 @@ export async function POST(request) {
           where: { id: booking.id },
           data: {
             paymentStatus: "paid",
-            status: "confirmed",
+            // Keep status as "pending" - admin needs to confirm
             stripePaymentIntentId: session.payment_intent,
           },
         });
 
-        // Send confirmation email
+        // Get receipt URL from Stripe
+        let receiptUrl = null;
         try {
-          await sendBookingConfirmationEmail(booking, booking.user);
-          console.log(`Booking ${booking.id} confirmed and paid - confirmation email sent`);
+          if (session.payment_intent) {
+            const paymentIntent = await stripe.paymentIntents.retrieve(session.payment_intent, {
+              expand: ['charges'],
+            });
+            if (paymentIntent.charges?.data?.length > 0) {
+              const charge = paymentIntent.charges.data[0];
+              receiptUrl = charge.receipt_url;
+            }
+          }
+        } catch (receiptError) {
+          console.error('Error fetching receipt URL:', receiptError);
+          // Continue without receipt URL
+        }
+
+        // Send email to admin instead of confirmation to customer
+        try {
+          await sendNewBookingNotificationEmail(booking, booking.user, receiptUrl);
+          console.log(`Booking ${booking.id} paid - admin notification sent`);
         } catch (emailError) {
           // Log error but don't fail the webhook
-          console.error(`Failed to send confirmation email for booking ${booking.id}:`, emailError);
+          console.error(`Failed to send admin notification for booking ${booking.id}:`, emailError);
         }
       }
     } else if (event.type === "checkout.session.async_payment_failed") {

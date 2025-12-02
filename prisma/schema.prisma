@@ -73,6 +73,9 @@ model Booking {
   stripePaymentIntentId String? // Stripe Payment Intent ID
   stripeSessionId String? // Stripe Checkout Session ID
   amount         Float?   // Payment amount in SEK
+  // Cancellation fields
+  cancellationRequest String? // "pending", "approved", "rejected", null
+  cancellationRequestedAt DateTime? // When cancellation was requested
   user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt

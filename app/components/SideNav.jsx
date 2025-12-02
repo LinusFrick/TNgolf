@@ -135,10 +135,10 @@ export default function SideNav() {
               Admin
             </Link>
           ) : session ? (
-            // Mina bokningar - for logged in regular users
+            // Mitt GolfMind - for logged in regular users
             <Link
               href="/boka"
-              aria-label="Visa mina bokningar"
+              aria-label="Visa mitt GolfMind"
               aria-current={pathname === '/boka' ? 'page' : undefined}
               className={`w-full text-left rounded-lg transition-all duration-200 min-h-[44px] min-w-[44px]
                 md:px-3 md:py-2.5 md:text-sm
@@ -154,7 +154,7 @@ export default function SideNav() {
                     : 'text-white hover:text-yellow-300 hover:bg-gray-700/50'
               }`}
             >
-              Mina bokningar
+              Mitt GolfMind
             </Link>
           ) : (
             // Boka - for non-logged in users

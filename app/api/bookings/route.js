@@ -55,14 +55,52 @@ export async function POST(request) {
       );
     }
 
+    // Parse date correctly to avoid timezone issues
+    // date is in format "YYYY-MM-DD"
+    const [year, month, day] = date.split('-').map(Number);
+    const bookingDate = new Date(year, month - 1, day, 0, 0, 0, 0); // month is 0-indexed
+    
+    // Validate date - no bookings on Sundays (day 0)
+    if (bookingDate.getDay() === 0) {
+      return NextResponse.json(
+        { error: "Bokningar är inte tillåtna på söndagar" },
+        { status: 400 }
+      );
+    }
+
+    // Validate that date is not in the past
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (bookingDate < today) {
+      return NextResponse.json(
+        { error: "Du kan inte boka ett datum som redan har passerat" },
+        { status: 400 }
+      );
+    }
+
+    // Clean up old pending bookings that haven't been paid (older than 30 minutes)
+    // This frees up time slots if someone started booking but didn't complete payment
+    const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
+    await prisma.booking.deleteMany({
+      where: {
+        status: 'pending',
+        paymentStatus: 'pending',
+        createdAt: {
+          lt: thirtyMinutesAgo,
+        },
+      },
+    });
+
     // Check if time slot is already booked
+    // Only check for confirmed bookings or paid bookings (not pending payments)
     const existingBooking = await prisma.booking.findFirst({
       where: {
-        date: new Date(date),
+        date: bookingDate,
         time: time,
-        status: {
-          in: ['pending', 'confirmed'],
-        },
+        OR: [
+          { status: 'confirmed' },
+          { paymentStatus: 'paid' }, // Paid but not yet confirmed by admin
+        ],
       },
     });
 
@@ -86,7 +124,7 @@ export async function POST(request) {
       data: {
         userId: session.user.id,
         serviceType,
-        date: new Date(date),
+        date: bookingDate, // Use the correctly parsed date
         time,
         notes: notes || null,
         paymentMethod: paymentMethod || null,
