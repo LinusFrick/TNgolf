@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import Stripe from "stripe";
-import { sendNewBookingNotificationEmail } from "../../lib/email";
+import { sendNewBookingNotificationEmail } from "../../../lib/email";
 
 const prisma = new PrismaClient();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
