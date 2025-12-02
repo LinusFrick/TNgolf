@@ -32,8 +32,10 @@ export default function NavBar() {
             {/* Hamburger Menu Button */}
             <button
                 onClick={toggleMenu}
-                className={`p-2 ${isLight ? 'text-black hover:text-yellow-600' : 'text-white hover:text-yellow-300'} transition-colors z-50 relative`}
-                aria-label="Toggle menu"
+                aria-label={navbarOpen ? "Stäng meny" : "Öppna meny"}
+                aria-expanded={navbarOpen}
+                aria-controls="mobile-menu"
+                className={`min-h-[44px] min-w-[44px] p-2 ${isLight ? 'text-black hover:text-yellow-600' : 'text-white hover:text-yellow-300'} transition-colors z-50 relative focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:ring-offset-2 rounded-lg`}
             >
                 <motion.div
                     animate={navbarOpen ? { rotate: 90 } : { rotate: 0 }}
@@ -80,19 +82,21 @@ export default function NavBar() {
 
                         {/* Menu Panel */}
                         <motion.nav
+                            id="mobile-menu"
                             initial={{ x: '100%' }}
                             animate={{ x: 0 }}
                             exit={{ x: '100%' }}
                             transition={{ type: 'spring', damping: 25, stiffness: 200 }}
                             className="fixed top-0 right-0 h-full w-80 bg-gray-900 dark:bg-gray-800 shadow-2xl z-50 overflow-y-auto"
+                            aria-label="Huvudmeny"
                         >
                             <div className="flex flex-col h-full">
                                 {/* Close Button */}
                                 <div className="flex justify-end items-center p-6">
                                     <button
                                         onClick={handleCloseMenu}
-                                        className="p-2 text-white hover:text-yellow-300 transition-colors rounded-lg hover:bg-gray-800"
-                                        aria-label="Close menu"
+                                        className="min-h-[44px] min-w-[44px] p-2 text-white hover:text-yellow-300 transition-colors rounded-lg hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:ring-offset-2"
+                                        aria-label="Stäng meny"
                                     >
                                         <svg
                                             xmlns="http://www.w3.org/2000/svg"
@@ -128,11 +132,12 @@ export default function NavBar() {
                                             <Link
                                                 href={link.href}
                                                 onClick={handleCloseMenu}
-                                                className={`block py-3 px-4 rounded-lg text-lg font-semibold transition-all duration-200 ${
+                                                className={`block min-h-[44px] py-3 px-4 rounded-lg text-lg font-semibold transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:ring-offset-2 ${
                                                     link.href === path
                                                         ? 'text-yellow-400 bg-yellow-400/10 border-l-4 border-yellow-400'
                                                         : 'text-white hover:text-yellow-300 hover:bg-gray-800'
                                                 }`}
+                                                aria-current={link.href === path ? 'page' : undefined}
                                             >
                                                 {link.placeholder}
                                             </Link>

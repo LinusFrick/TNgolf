@@ -5,6 +5,7 @@ import { useTheme } from './useTheme';
 
 const ThemeToggle = () => {
     const [activeTheme, setActiveTheme] = useState('dark');
+    const [isAnimating, setIsAnimating] = useState(false);
     const theme = useTheme();
     const inactiveTheme = activeTheme === 'dark' ? 'light': 'dark';
     const isLight = theme === 'light';
@@ -18,19 +19,37 @@ const ThemeToggle = () => {
         setActiveTheme(theme);
     }, [theme]);
 
-    const iconColor = isLight ? 'text-black hover:text-yellow-600' : 'text-white hover:text-yellow-300';
+    const handleToggle = () => {
+        setIsAnimating(true);
+        setActiveTheme(inactiveTheme);
+        setTimeout(() => setIsAnimating(false), 300);
+    };
 
     return (
         <button 
-            onClick={() => setActiveTheme(inactiveTheme)}
-            className={`${iconColor} transition-colors duration-200 flex items-center justify-center`}
-            aria-label="Toggle theme"
+            onClick={handleToggle}
+            className={`
+                min-h-[44px] min-w-[44px] 
+                flex items-center justify-center
+                rounded-lg
+                transition-all duration-300
+                focus:outline-none
+                ${isLight 
+                    ? 'bg-gray-200 hover:bg-gray-300 text-gray-900 active:bg-gray-400' 
+                    : 'bg-gray-700 hover:bg-gray-600 text-white active:bg-gray-500'
+                }
+                ${isAnimating ? 'scale-95' : 'scale-100'}
+            `}
+            aria-label={`Växla till ${inactiveTheme === 'dark' ? 'mörkt' : 'ljusst'} tema`}
+            aria-pressed={activeTheme === 'dark'}
         >
-            {activeTheme === 'dark' ? (
-                <HiSun className="w-5 h-5" />
-            ) : (
-                <HiMoon className="w-5 h-5" />
-            )}
+            <div className={`transition-transform duration-300 ${isAnimating ? 'rotate-180' : 'rotate-0'}`}>
+                {activeTheme === 'dark' ? (
+                    <HiSun className="w-5 h-5" />
+                ) : (
+                    <HiMoon className="w-5 h-5" />
+                )}
+            </div>
         </button>
     );
 }

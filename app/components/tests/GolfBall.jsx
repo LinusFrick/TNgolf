@@ -638,7 +638,7 @@ export default function GolfBall({ scrollY = 0, theme = 'dark', currentSection =
           scale={config.scale}
           rollDistance={{ right: config.rollRight, rollOut: config.rollOut, left: config.rollLeft, startLeft: config.startLeft }}
         />
-      </Canvas>
+    </Canvas>
     </div>
   );
 }
