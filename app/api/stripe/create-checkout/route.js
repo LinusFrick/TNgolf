@@ -66,6 +66,13 @@ export async function POST(request) {
     const amount = service.price;
     const dateStr = new Date(booking.date).toLocaleDateString('sv-SE');
 
+    // Get base URL from environment or request headers
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 
+                    process.env.NEXTAUTH_URL ||
+                    (request.headers.get('origin') || request.headers.get('host') 
+                      ? `${request.headers.get('x-forwarded-proto') || 'https'}://${request.headers.get('host')}`
+                      : 'http://localhost:3000');
+
     // Create Stripe Checkout Session
     const checkoutSession = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
@@ -83,8 +90,8 @@ export async function POST(request) {
         },
       ],
       mode: 'payment',
-      success_url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/boka?booking=${bookingId}&payment=success&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/boka?booking=${bookingId}&payment=cancelled`,
+      success_url: `${baseUrl}/boka?booking=${bookingId}&payment=success&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${baseUrl}/boka?booking=${bookingId}&payment=cancelled`,
       customer_email: booking.user.email,
       metadata: {
         bookingId: booking.id,
